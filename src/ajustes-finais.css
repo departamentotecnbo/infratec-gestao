@@ -1,0 +1,497 @@
+    /* =========================================================
+   ETAPA 2 - AJUSTES FINOS DE ESPAÇAMENTO, BOTÕES, TABELAS,
+   MODAIS E RESPONSIVIDADE
+   ========================================================= */
+
+/* LAYOUT GERAL */
+
+.content {
+  max-width: 1680px;
+  margin-left: var(--ui-sidebar-width);
+  padding: 30px 34px 42px;
+}
+
+.topbar {
+  min-height: 64px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.topbar h2 {
+  font-size: 22px;
+}
+
+.topbar p {
+  font-size: 10px;
+}
+
+/* BOTÕES */
+
+.primary-button,
+.secondary-button {
+  min-height: 41px;
+  padding: 0 15px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.icon-button {
+  width: 35px;
+  height: 35px;
+  border-radius: 8px;
+}
+
+.logout-button {
+  min-height: 42px;
+  margin-top: 14px;
+  border: 1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
+}
+
+.logout-button:hover {
+  border-color: rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.055);
+}
+
+/* PAINÉIS */
+
+.panel {
+  border-radius: 13px;
+}
+
+.panel-header {
+  min-height: 70px;
+  padding: 17px 20px;
+}
+
+.panel-header h3 {
+  font-size: 13px;
+}
+
+.panel-header p {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+/* TABELAS */
+
+.table-wrapper {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cfd3d8 transparent;
+}
+
+.clients-table {
+  min-width: 760px;
+}
+
+.clients-table th {
+  height: 44px;
+  padding: 0 15px;
+  font-size: 8px;
+}
+
+.clients-table td {
+  padding: 13px 15px;
+  font-size: 10px;
+}
+
+.clients-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.client-name {
+  font-size: 10px;
+}
+
+.client-secondary {
+  font-size: 8px;
+}
+
+/* FILTROS E BUSCA */
+
+.clients-toolbar,
+.products-toolbar,
+.report-filters {
+  padding: 14px 16px;
+}
+
+.search-box {
+  min-height: 42px;
+  border-radius: 8px;
+}
+
+.search-box input {
+  font-size: 10px;
+}
+
+.filter-select,
+.status-select-small,
+.report-date-field input,
+.report-select-field select {
+  min-height: 42px;
+  border-radius: 8px;
+}
+
+/* FORMULÁRIOS */
+
+.form-grid {
+  gap: 14px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  margin-bottom: 7px;
+  font-size: 10px;
+}
+
+.form-group input,
+.form-group select {
+  min-height: 45px;
+  padding: 0 13px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.form-group textarea {
+  min-height: 96px;
+  padding: 12px 13px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.form-section-title {
+  margin: 23px 0 13px;
+  padding-top: 15px;
+  font-size: 9px;
+  letter-spacing: .055em;
+}
+
+/* MODAIS */
+
+.modal-overlay {
+  padding: 20px;
+}
+
+.modal-box {
+  width: min(900px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  border-radius: 15px;
+}
+
+.budget-modal,
+.history-modal {
+  width: min(1220px, calc(100vw - 40px));
+}
+
+.payment-modal {
+  width: min(880px, calc(100vw - 40px));
+}
+
+.modal-header {
+  min-height: 82px;
+  padding: 19px 24px;
+}
+
+.modal-header h3 {
+  font-size: 17px;
+}
+
+.modal-header p {
+  font-size: 9px;
+}
+
+.modal-body {
+  max-height: calc(100vh - 188px);
+  padding: 24px;
+}
+
+.modal-footer {
+  min-height: 70px;
+  padding: 13px 20px;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+}
+
+/* ORÇAMENTO */
+
+.add-item-row select {
+  min-height: 46px;
+  border-radius: 8px;
+}
+
+.budget-empty-items {
+  min-height: 108px;
+  padding: 28px;
+}
+
+.budget-item-header,
+.budget-item-row {
+  grid-template-columns:
+    minmax(240px, 2fr)
+    90px
+    140px
+    140px
+    44px;
+}
+
+.budget-item-header {
+  min-height: 42px;
+}
+
+.budget-item-row {
+  min-height: 58px;
+}
+
+.budget-totals {
+  max-width: 360px;
+  padding: 17px;
+}
+
+/* DASHBOARD */
+
+.dashboard-kpis {
+  gap: 12px;
+}
+
+.dashboard-kpi {
+  min-height: 94px;
+  padding: 15px;
+}
+
+.dashboard-money {
+  gap: 12px;
+}
+
+.dashboard-money-card {
+  min-height: 104px;
+  padding: 15px;
+}
+
+.dashboard-grid {
+  gap: 14px;
+}
+
+.dashboard-list-item {
+  min-height: 56px;
+}
+
+.dashboard-shortcuts {
+  gap: 12px;
+}
+
+.dashboard-shortcut {
+  min-height: 66px;
+}
+
+/* CONFIGURAÇÕES */
+
+.settings-simple {
+  max-width: 1160px;
+}
+
+.settings-simple .settings-body {
+  padding: 24px;
+}
+
+.settings-simple .settings-footer {
+  min-height: 70px;
+}
+
+/* RELATÓRIOS */
+
+.report-filters {
+  gap: 10px;
+}
+
+.report-card {
+  min-height: 98px;
+  padding: 15px;
+}
+
+/* RECEBIMENTOS */
+
+.payment-summary-card {
+  min-height: 80px;
+}
+
+.payment-history-item {
+  min-height: 60px;
+}
+
+/* RESPONSIVIDADE */
+
+@media (max-width: 1180px) {
+  .content {
+    padding: 24px 24px 34px;
+  }
+
+  .budget-modal,
+  .history-modal {
+    width: min(1080px, calc(100vw - 28px));
+  }
+
+  .budget-item-header,
+  .budget-item-row {
+    grid-template-columns:
+      minmax(210px, 1.6fr)
+      80px
+      125px
+      125px
+      40px;
+  }
+}
+
+@media (max-width: 900px) {
+  .content {
+    padding: 22px 18px 30px;
+  }
+
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar-actions,
+  .dashboard-top-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+
+  .modal-box,
+  .budget-modal,
+  .history-modal,
+  .payment-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 168px);
+    padding: 18px;
+  }
+
+  .modal-header {
+    min-height: 72px;
+    padding: 16px 18px;
+  }
+
+  .modal-footer {
+    min-height: 64px;
+    padding: 11px 16px;
+  }
+
+  .budget-item-header {
+    display: none;
+  }
+
+  .budget-item-row {
+    grid-template-columns: 1fr 85px;
+    gap: 10px;
+  }
+
+  .budget-item-row > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .budget-item-row > strong {
+    text-align: right;
+  }
+}
+
+@media (max-width: 680px) {
+  .content {
+    padding: 18px 14px 26px;
+  }
+
+  .topbar h2 {
+    font-size: 20px;
+  }
+
+  .primary-button,
+  .secondary-button {
+    min-height: 40px;
+  }
+
+  .dashboard-kpis,
+  .dashboard-money-four,
+  .dashboard-shortcuts,
+  .history-summary,
+  .history-client-info,
+  .payment-summary,
+  .payment-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-date-field,
+  .report-select-field,
+  .report-client-field {
+    width: 100%;
+  }
+
+  .report-shortcuts {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modal-footer .primary-button,
+  .modal-footer .secondary-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 15px 11px 22px;
+  }
+
+  .modal-overlay {
+    padding: 6px;
+  }
+
+  .modal-box,
+  .budget-modal,
+  .history-modal,
+  .payment-modal {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    border-radius: 12px;
+  }
+
+  .modal-body {
+    padding: 14px;
+  }
+
+  .modal-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .field-large {
+    grid-column: auto !important;
+  }
+}
