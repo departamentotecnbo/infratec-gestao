@@ -1,0 +1,155 @@
+/* =========================================================
+   LOGIN MOBILE - AJUSTE FINAL
+   ========================================================= */
+
+.login-mobile-brand {
+  display: none;
+}
+
+.login-mobile-logo {
+  display: block;
+  width: 190px;
+  max-width: 72vw;
+  height: 78px;
+  object-fit: contain;
+  object-position: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .login-page-pro {
+    min-height: 100dvh;
+    padding: 18px 14px;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+  }
+
+  .login-shell {
+    width: min(100%, 520px);
+    min-height: auto;
+    grid-template-columns: 1fr;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .login-visual {
+    display: none !important;
+  }
+
+  .login-form-panel {
+    width: 100%;
+    min-width: 0;
+    padding: 30px 22px 28px;
+    border-radius: 20px;
+  }
+
+  .login-form-wrap {
+    width: 100% !important;
+    max-width: 440px !important;
+    margin: 0 auto;
+  }
+
+  .login-mobile-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 22px;
+  }
+
+  .login-heading {
+    width: 100%;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .login-heading .login-icon-pro {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .login-heading h2 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .login-heading p {
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .login-form-pro {
+    width: 100%;
+  }
+
+  .login-field {
+    width: 100%;
+  }
+
+  .login-input-wrap {
+    width: 100%;
+  }
+
+  .login-input-wrap input {
+    width: 100% !important;
+    min-width: 0;
+    height: 54px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .login-submit-pro {
+    width: 100% !important;
+    min-height: 54px;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+  .login-access-note {
+    justify-content: center;
+    margin-top: 20px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .login-page-pro {
+    padding: 12px 10px;
+  }
+
+  .login-shell {
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  .login-form-panel {
+    padding: 26px 16px 24px;
+  }
+
+  .login-form-wrap {
+    max-width: none !important;
+  }
+
+  .login-mobile-logo {
+    width: 170px;
+    height: 68px;
+  }
+
+  .login-heading h2 {
+    font-size: 22px;
+  }
+
+  .login-heading p {
+    font-size: 11px;
+  }
+
+  .login-input-wrap input,
+  .login-submit-pro {
+    height: 52px;
+  }
+}

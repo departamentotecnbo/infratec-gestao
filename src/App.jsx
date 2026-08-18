@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import './produtos-lucro.css'
 import './visual-final.css'
 import './login-profissional.css'
+import './login-mobile-final.css'
 import './ajustes-finais.css'
 import './dashboard-config-final.css'
 import './compras-final.css'
@@ -2753,14 +2753,11 @@ async function excluirOrdem(ordem) {
             <div className="login-form-wrap">
 
               <div className="login-mobile-brand">
-                <div className="brand-logo">
-                  I
-                </div>
-
-                <div>
-                  <strong>INFRATEC</strong>
-                  <span>Sistema de Gestão</span>
-                </div>
+                <img
+                  src="https://rtonfaxsfynsvpftodpu.supabase.co/storage/v1/object/public/logos/ChatGPT%20Image%2014%20de%20ago.%20de%202026,%2022_31_26%20(2).png"
+                  alt="Logo INFRATEC"
+                  className="login-mobile-logo"
+                />
               </div>
 
               <div className="login-heading">
