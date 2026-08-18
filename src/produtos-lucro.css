@@ -1,0 +1,27 @@
+/* =========================================================
+   PRODUTOS - LUCRO E PREÇO SUGERIDO
+   ========================================================= */
+
+.calculated-field {
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.calculated-field.profit {
+  color: #2d7950;
+  background: #f3faf6;
+  border-color: #d9eee1;
+}
+
+.calculated-field.suggested {
+  color: #8b6b07;
+  background: #fffaf0;
+  border-color: #f0e3b2;
+}

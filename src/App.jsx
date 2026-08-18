@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import './produtos-lucro.css'
 import './visual-final.css'
 import './login-profissional.css'
 import './ajustes-finais.css'
 import './dashboard-config-final.css'
+import './compras-final.css'
+import { lerXmlNfe } from './nfeXml'
 import {
   LayoutDashboard,
   Users,
@@ -55,6 +58,8 @@ const produtoVazio = {
   codigo: '',
   categoria: '',
   custo: '',
+  percentual_lucro: '20',
+  preco_sugerido: '',
   valor_venda: '',
   estoque: '',
   unidade: 'un',
@@ -91,6 +96,23 @@ const configuracaoVazia = {
 }
 
 function App() {
+
+  const [modalImportarXml, setModalImportarXml] = useState(false)
+
+const [xmlCarregando, setXmlCarregando] = useState(false)
+
+const [xmlImportado, setXmlImportado] = useState(null)
+
+const [salvandoCompra, setSalvandoCompra] = useState(false)
+
+  const [compras, setCompras] = useState([])
+  const [carregandoCompras, setCarregandoCompras] = useState(false)
+  const [buscaCompra, setBuscaCompra] = useState('')
+
+  const [modalCompraDetalhe, setModalCompraDetalhe] = useState(false)
+  const [compraDetalhe, setCompraDetalhe] = useState(null)
+  const [itensCompraDetalhe, setItensCompraDetalhe] = useState([])
+  const [carregandoCompraDetalhe, setCarregandoCompraDetalhe] = useState(false)
   const [pagina, setPagina] = useState('dashboard')
 
   const [session, setSession] = useState(null)
@@ -209,6 +231,7 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
   carregarOrcamentos()
   carregarOrdens()
   carregarRecebimentos()
+  carregarCompras()
   carregarConfiguracao()
 }
   }, [session])
@@ -271,6 +294,11 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
       carregarProdutos()
     }
 
+    if (novaPagina === 'compras') {
+      carregarCompras()
+      carregarProdutos()
+    }
+
     if (novaPagina === 'dashboard') {
       carregarOrcamentos()
       carregarOrdens()
@@ -294,6 +322,431 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
 
     if (novaPagina === 'configuracoes') {
       carregarConfiguracao()
+    }
+  }
+
+  /* COMPRAS */
+
+  async function carregarCompras() {
+    setCarregandoCompras(true)
+
+    const { data, error } = await supabase
+      .from('compras')
+      .select(`
+        *,
+        fornecedores (
+          id,
+          razao_social,
+          nome_fantasia,
+          cnpj
+        ),
+        compra_itens (
+          id
+        )
+      `)
+      .order('data_emissao', {
+        ascending: false,
+        nullsFirst: false
+      })
+      .order('created_at', {
+        ascending: false
+      })
+
+    if (error) {
+      console.error(error)
+
+      mostrarMensagem(
+        'Não foi possível carregar as compras.',
+        'erro'
+      )
+
+      setCarregandoCompras(false)
+      return []
+    }
+
+    const lista = data || []
+
+    setCompras(lista)
+    setCarregandoCompras(false)
+
+    return lista
+  }
+
+  async function abrirDetalheCompra(compra) {
+    setCompraDetalhe(compra)
+    setItensCompraDetalhe([])
+    setModalCompraDetalhe(true)
+    setCarregandoCompraDetalhe(true)
+
+    const { data, error } = await supabase
+      .from('compra_itens')
+      .select(`
+        *,
+        produtos (
+          id,
+          nome,
+          valor_venda,
+          preco_sugerido,
+          percentual_lucro
+        )
+      `)
+      .eq('compra_id', compra.id)
+      .order('id', { ascending: true })
+
+    if (error) {
+      console.error(error)
+
+      mostrarMensagem(
+        'Não foi possível carregar os itens da compra.',
+        'erro'
+      )
+
+      setItensCompraDetalhe([])
+    } else {
+      setItensCompraDetalhe(data || [])
+    }
+
+    setCarregandoCompraDetalhe(false)
+  }
+
+  function fecharDetalheCompra() {
+    setModalCompraDetalhe(false)
+    setCompraDetalhe(null)
+    setItensCompraDetalhe([])
+  }
+
+  /* IMPORTAÇÃO DE XML / COMPRAS */
+
+  function abrirImportacaoXml() {
+    setXmlImportado(null)
+    setModalImportarXml(true)
+  }
+
+  function fecharImportacaoXml() {
+    if (salvandoCompra) return
+
+    setModalImportarXml(false)
+    setXmlImportado(null)
+    setXmlCarregando(false)
+  }
+
+  async function selecionarXmlNfe(evento) {
+    const arquivo = evento.target.files?.[0]
+
+    if (!arquivo) return
+
+    try {
+      setXmlCarregando(true)
+
+      const dados = await lerXmlNfe(arquivo)
+
+      const itensComProduto = dados.itens.map((item) => {
+        let produtoEncontrado = null
+
+        if (item.ean_gtin) {
+          produtoEncontrado = produtos.find(
+            (produto) =>
+              String(produto.ean_gtin || '') ===
+              String(item.ean_gtin)
+          )
+        }
+
+        if (!produtoEncontrado && item.codigo_fornecedor) {
+          produtoEncontrado = produtos.find(
+            (produto) =>
+              String(produto.codigo_fornecedor || '') ===
+              String(item.codigo_fornecedor)
+          )
+        }
+
+        const percentualLucro = Number(
+          produtoEncontrado?.percentual_lucro || 20
+        )
+
+        return {
+          ...item,
+          produto_id: produtoEncontrado?.id || null,
+          produto_encontrado: Boolean(produtoEncontrado),
+          percentual_lucro: percentualLucro,
+          preco_sugerido: calcularPrecoSugerido(
+            item.custo_unitario_final,
+            percentualLucro
+          ),
+          valor_venda_atual: Number(
+            produtoEncontrado?.valor_venda || 0
+          )
+        }
+      })
+
+      setXmlImportado({
+        ...dados,
+        itens: itensComProduto
+      })
+    } catch (error) {
+      console.error(error)
+
+      mostrarMensagem(
+        error.message || 'Não foi possível ler o XML.',
+        'erro'
+      )
+
+      setXmlImportado(null)
+    } finally {
+      setXmlCarregando(false)
+      evento.target.value = ''
+    }
+  }
+
+  function calcularPrecoSugerido(custo, percentual) {
+    const valorCusto = Number(custo || 0)
+    const lucro = Number(percentual || 0)
+
+    return valorCusto * (1 + lucro / 100)
+  }
+
+  function alterarLucroItemXml(indice, novoPercentual) {
+    setXmlImportado((anterior) => {
+      if (!anterior) return anterior
+
+      const itens = [...anterior.itens]
+      const item = itens[indice]
+      const percentual = Number(novoPercentual || 0)
+
+      itens[indice] = {
+        ...item,
+        percentual_lucro: percentual,
+        preco_sugerido: calcularPrecoSugerido(
+          item.custo_unitario_final,
+          percentual
+        )
+      }
+
+      return {
+        ...anterior,
+        itens
+      }
+    })
+  }
+
+  async function confirmarEntradaXml() {
+    if (!xmlImportado) return
+
+    try {
+      setSalvandoCompra(true)
+
+      const fornecedorXml = xmlImportado.fornecedor
+      let fornecedorId = null
+
+      if (fornecedorXml.cnpj) {
+        const { data, error } = await supabase
+          .from('fornecedores')
+          .select('id')
+          .eq('cnpj', fornecedorXml.cnpj)
+          .maybeSingle()
+
+        if (error) throw error
+
+        fornecedorId = data?.id || null
+      }
+
+      if (!fornecedorId) {
+        const { data, error } = await supabase
+          .from('fornecedores')
+          .insert([
+            {
+              razao_social:
+                fornecedorXml.razao_social || 'Fornecedor',
+              nome_fantasia:
+                fornecedorXml.nome_fantasia || null,
+              cnpj: fornecedorXml.cnpj || null,
+              inscricao_estadual:
+                fornecedorXml.inscricao_estadual || null,
+              telefone:
+                fornecedorXml.telefone || null,
+              endereco:
+                fornecedorXml.endereco || null,
+              numero:
+                fornecedorXml.numero || null,
+              bairro:
+                fornecedorXml.bairro || null,
+              cidade:
+                fornecedorXml.cidade || null,
+              estado:
+                fornecedorXml.estado || null,
+              cep:
+                fornecedorXml.cep || null
+            }
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        fornecedorId = data.id
+      }
+
+      const { data: compra, error: erroCompra } = await supabase
+        .from('compras')
+        .insert([
+          {
+            fornecedor_id: fornecedorId,
+            numero_nota: xmlImportado.nota.numero_nota,
+            serie: xmlImportado.nota.serie,
+            chave_acesso: xmlImportado.nota.chave_acesso,
+            data_emissao:
+              xmlImportado.nota.data_emissao || null,
+            valor_produtos:
+              xmlImportado.nota.valor_produtos,
+            valor_frete:
+              xmlImportado.nota.valor_frete,
+            valor_desconto:
+              xmlImportado.nota.valor_desconto,
+            valor_total:
+              xmlImportado.nota.valor_total,
+            origem: 'xml',
+            nome_arquivo_xml:
+              xmlImportado.arquivo,
+            xml_importado: true
+          }
+        ])
+        .select()
+        .single()
+
+      if (erroCompra) throw erroCompra
+
+      for (const item of xmlImportado.itens) {
+        let produtoId = item.produto_id
+
+        if (!produtoId) {
+          const { data, error } = await supabase
+            .from('produtos')
+            .insert([
+              {
+                tipo: 'produto',
+                nome: item.nome_produto,
+                codigo:
+                  item.codigo_fornecedor || null,
+                codigo_fornecedor:
+                  item.codigo_fornecedor || null,
+                ean_gtin:
+                  item.ean_gtin || null,
+                ncm: item.ncm || null,
+                unidade: item.unidade || 'UN',
+                custo:
+                  item.custo_unitario_final,
+                custo_ultima_compra:
+                  item.custo_unitario_final,
+                percentual_lucro:
+                  item.percentual_lucro,
+                preco_sugerido:
+                  item.preco_sugerido,
+                valor_venda:
+                  item.preco_sugerido,
+                ultima_compra_em:
+                  new Date().toISOString(),
+                ativo: true
+              }
+            ])
+            .select()
+            .single()
+
+          if (error) throw error
+
+          produtoId = data.id
+        } else {
+          const { error } = await supabase
+            .from('produtos')
+            .update({
+              custo:
+                item.custo_unitario_final,
+              custo_ultima_compra:
+                item.custo_unitario_final,
+              percentual_lucro:
+                item.percentual_lucro,
+              preco_sugerido:
+                item.preco_sugerido,
+              codigo_fornecedor:
+                item.codigo_fornecedor || null,
+              ean_gtin:
+                item.ean_gtin || null,
+              ncm:
+                item.ncm || null,
+              ultima_compra_em:
+                new Date().toISOString(),
+              updated_at:
+                new Date().toISOString()
+            })
+            .eq('id', produtoId)
+
+          if (error) throw error
+        }
+
+        const { error: erroItem } = await supabase
+          .from('compra_itens')
+          .insert([
+            {
+              compra_id: compra.id,
+              produto_id: produtoId,
+              codigo_fornecedor:
+                item.codigo_fornecedor || null,
+              ean_gtin:
+                item.ean_gtin || null,
+              nome_produto:
+                item.nome_produto,
+              ncm:
+                item.ncm || null,
+              cfop:
+                item.cfop || null,
+              unidade:
+                item.unidade || null,
+              quantidade:
+                item.quantidade,
+              valor_unitario:
+                item.valor_unitario,
+              valor_total:
+                item.valor_total,
+              desconto:
+                item.desconto,
+              frete:
+                item.frete,
+              custo_unitario_final:
+                item.custo_unitario_final
+            }
+          ])
+
+        if (erroItem) throw erroItem
+      }
+
+      await Promise.all([
+        carregarProdutos(),
+        carregarCompras()
+      ])
+
+      setXmlImportado(null)
+      setModalImportarXml(false)
+
+      mostrarMensagem('Compra importada com sucesso.')
+    } catch (error) {
+      console.error(error)
+
+      const mensagemErro = String(error?.message || '')
+
+      if (
+        mensagemErro.includes('compras_chave_acesso_unique') ||
+        mensagemErro.toLowerCase().includes('duplicate key')
+      ) {
+        mostrarMensagem(
+          'Esta NF-e já foi importada anteriormente.',
+          'erro'
+        )
+      } else {
+        mostrarMensagem(
+          'Não foi possível concluir a importação.',
+          'erro'
+        )
+      }
+    } finally {
+      setSalvandoCompra(false)
     }
   }
 
@@ -647,12 +1100,36 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
   function abrirEdicaoProduto(produto) {
     setProdutoEditando(produto)
 
+    const custoAtual = Number(
+      produto.custo_ultima_compra ||
+      produto.custo ||
+      0
+    )
+
+    const percentualAtual = Number(
+      produto.percentual_lucro || 20
+    )
+
+    const sugeridoAtual =
+      Number(produto.preco_sugerido) > 0
+        ? Number(produto.preco_sugerido)
+        : custoAtual * (1 + percentualAtual / 100)
+
     setFormProduto({
       tipo: produto.tipo || 'produto',
       nome: produto.nome || '',
       codigo: produto.codigo || '',
       categoria: produto.categoria || '',
-      custo: produto.custo !== null ? String(produto.custo) : '',
+      custo:
+        produto.custo !== null
+          ? String(produto.custo)
+          : '',
+      percentual_lucro:
+        String(percentualAtual),
+      preco_sugerido:
+        String(
+          Number(sugeridoAtual.toFixed(2))
+        ),
       valor_venda:
         produto.valor_venda !== null
           ? String(produto.valor_venda)
@@ -688,6 +1165,8 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
       if (name === 'tipo' && value === 'servico') {
         novosDados.estoque = '0'
         novosDados.unidade = 'serv'
+        novosDados.percentual_lucro = ''
+        novosDados.preco_sugerido = ''
       }
 
       if (
@@ -696,6 +1175,43 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
         anterior.unidade === 'serv'
       ) {
         novosDados.unidade = 'un'
+        novosDados.percentual_lucro =
+          anterior.percentual_lucro || '20'
+      }
+
+      if (
+        novosDados.tipo === 'produto' &&
+        (
+          name === 'custo' ||
+          name === 'percentual_lucro' ||
+          name === 'tipo'
+        )
+      ) {
+        const custo = Number(
+          String(novosDados.custo || '0')
+            .replace(',', '.')
+        )
+
+        const percentual = Number(
+          String(
+            novosDados.percentual_lucro || '0'
+          ).replace(',', '.')
+        )
+
+        if (
+          Number.isFinite(custo) &&
+          Number.isFinite(percentual)
+        ) {
+          novosDados.preco_sugerido =
+            String(
+              Number(
+                (
+                  custo *
+                  (1 + percentual / 100)
+                ).toFixed(2)
+              )
+            )
+        }
       }
 
       return novosDados
@@ -712,6 +1228,16 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
 
     const valorVenda = Number(formProduto.valor_venda || 0)
     const custo = Number(formProduto.custo || 0)
+    const percentualLucro =
+      formProduto.tipo === 'produto'
+        ? Number(formProduto.percentual_lucro || 0)
+        : 0
+
+    const precoSugerido =
+      formProduto.tipo === 'produto'
+        ? Number(formProduto.preco_sugerido || 0)
+        : 0
+
     const estoque = Number(formProduto.estoque || 0)
 
     setSalvandoProduto(true)
@@ -722,6 +1248,18 @@ const [salvandoOrdem, setSalvandoOrdem] = useState(false)
       codigo: formProduto.codigo.trim() || null,
       categoria: formProduto.categoria.trim() || null,
       custo,
+      custo_ultima_compra:
+        formProduto.tipo === 'produto'
+          ? custo
+          : 0,
+      percentual_lucro:
+        percentualLucro,
+      preco_sugerido:
+        precoSugerido,
+      tipo_calculo_preco:
+        formProduto.tipo === 'produto'
+          ? 'sobre_custo'
+          : 'sobre_custo',
       valor_venda: valorVenda,
       estoque: formProduto.tipo === 'servico' ? 0 : estoque,
       unidade:
@@ -1877,6 +2415,34 @@ async function excluirOrdem(ordem) {
     return correspondeBusca && correspondeTipo
   })
 
+  const comprasFiltradas = compras.filter((compra) => {
+    const busca = buscaCompra.toLowerCase().trim()
+
+    if (!busca) {
+      return true
+    }
+
+    const fornecedor =
+      compra.fornecedores?.nome_fantasia ||
+      compra.fornecedores?.razao_social ||
+      ''
+
+    return (
+      String(compra.numero_nota || '')
+        .toLowerCase()
+        .includes(busca) ||
+      String(compra.serie || '')
+        .toLowerCase()
+        .includes(busca) ||
+      String(compra.chave_acesso || '')
+        .toLowerCase()
+        .includes(busca) ||
+      String(fornecedor)
+        .toLowerCase()
+        .includes(busca)
+    )
+  })
+
   const orcamentosFiltrados = orcamentos.filter((orcamento) => {
     const busca = buscaOrcamento.toLowerCase().trim()
 
@@ -2343,6 +2909,13 @@ async function excluirOrdem(ordem) {
           />
 
           <MenuButton
+            ativo={pagina === 'compras'}
+            onClick={() => selecionarPagina('compras')}
+            icone={<Boxes size={18} />}
+            texto="Compras"
+          />
+
+          <MenuButton
             ativo={pagina === 'relatorios'}
             onClick={() => selecionarPagina('relatorios')}
             icone={<BarChart3 size={18} />}
@@ -2431,8 +3004,21 @@ async function excluirOrdem(ordem) {
             setFiltroTipo={setFiltroTipoProduto}
             abrirNovoProduto={() => abrirNovoProduto('produto')}
             abrirNovoServico={() => abrirNovoProduto('servico')}
+            abrirImportacaoXml={abrirImportacaoXml}
             editar={abrirEdicaoProduto}
             excluir={excluirProduto}
+          />
+        )}
+
+        {pagina === 'compras' && (
+          <PaginaCompras
+            compras={comprasFiltradas}
+            totalCompras={compras.length}
+            carregando={carregandoCompras}
+            busca={buscaCompra}
+            setBusca={setBuscaCompra}
+            importarXml={abrirImportacaoXml}
+            visualizar={abrirDetalheCompra}
           />
         )}
 
@@ -2501,6 +3087,27 @@ async function excluirOrdem(ordem) {
         )}
 
       </main>
+
+      {modalImportarXml && (
+        <ModalImportarXml
+          dados={xmlImportado}
+          carregando={xmlCarregando}
+          salvando={salvandoCompra}
+          selecionarXml={selecionarXmlNfe}
+          alterarLucro={alterarLucroItemXml}
+          confirmar={confirmarEntradaXml}
+          fechar={fecharImportacaoXml}
+        />
+      )}
+
+      {modalCompraDetalhe && compraDetalhe && (
+        <ModalDetalheCompra
+          compra={compraDetalhe}
+          itens={itensCompraDetalhe}
+          carregando={carregandoCompraDetalhe}
+          fechar={fecharDetalheCompra}
+        />
+      )}
 
       {modalHistoricoCliente && clienteHistorico && (
         <ModalHistoricoCliente
@@ -3193,6 +3800,7 @@ function PaginaProdutos({
   setFiltroTipo,
   abrirNovoProduto,
   abrirNovoServico,
+  abrirImportacaoXml,
   editar,
   excluir
 }) {
@@ -3206,6 +3814,14 @@ function PaginaProdutos({
         </div>
 
         <div className="topbar-actions">
+
+          <button
+            className="secondary-button"
+            onClick={abrirImportacaoXml}
+          >
+            <FileText size={16} />
+            Importar XML
+          </button>
 
           <button
             className="secondary-button"
@@ -3361,6 +3977,487 @@ function PaginaProdutos({
 
       </section>
     </>
+  )
+}
+
+function PaginaCompras({
+  compras,
+  totalCompras,
+  carregando,
+  busca,
+  setBusca,
+  importarXml,
+  visualizar
+}) {
+  const totalValor = compras.reduce(
+    (total, compra) =>
+      total + Number(compra.valor_total || 0),
+    0
+  )
+
+  const fornecedoresUnicos = new Set(
+    compras
+      .map((compra) => compra.fornecedor_id)
+      .filter(Boolean)
+  ).size
+
+  const totalItens = compras.reduce(
+    (total, compra) =>
+      total + Number(compra.compra_itens?.length || 0),
+    0
+  )
+
+  return (
+    <>
+      <header className="topbar">
+
+        <div>
+          <div className="dashboard-eyebrow">
+            ENTRADAS
+          </div>
+
+          <h2>Compras</h2>
+
+          <p>
+            Consulte as NF-e importadas e os custos dos produtos
+          </p>
+        </div>
+
+        <button
+          className="primary-button"
+          onClick={importarXml}
+        >
+          <FileText size={16} />
+          Importar XML
+        </button>
+
+      </header>
+
+      <section className="purchase-summary">
+
+        <div className="purchase-summary-card">
+          <span>Notas importadas</span>
+          <strong>{totalCompras}</strong>
+          <small>Compras registradas</small>
+        </div>
+
+        <div className="purchase-summary-card">
+          <span>Valor em compras</span>
+          <strong>
+            {formatarMoeda(totalValor)}
+          </strong>
+          <small>Resultado da busca atual</small>
+        </div>
+
+        <div className="purchase-summary-card">
+          <span>Fornecedores</span>
+          <strong>{fornecedoresUnicos}</strong>
+          <small>Fornecedores na listagem</small>
+        </div>
+
+        <div className="purchase-summary-card">
+          <span>Itens importados</span>
+          <strong>{totalItens}</strong>
+          <small>Produtos nas notas</small>
+        </div>
+
+      </section>
+
+      <section className="panel">
+
+        <div className="products-toolbar">
+
+          <div className="search-box">
+            <Search size={17} />
+
+            <input
+              value={busca}
+              onChange={(e) =>
+                setBusca(e.target.value)
+              }
+              placeholder="Buscar por NF-e, fornecedor ou chave de acesso..."
+            />
+          </div>
+
+        </div>
+
+        {carregando ? (
+          <Carregando texto="Carregando compras..." />
+        ) : compras.length === 0 ? (
+          <Vazio
+            icone={<Boxes size={19} />}
+            titulo="Nenhuma compra encontrada"
+            texto="Importe o XML de uma NF-e para registrar a primeira entrada."
+          />
+        ) : (
+          <div className="table-wrapper">
+
+            <table className="clients-table purchase-table">
+
+              <thead>
+                <tr>
+                  <th>NF-e</th>
+                  <th>Fornecedor</th>
+                  <th>Emissão</th>
+                  <th>Itens</th>
+                  <th>Total</th>
+                  <th>Origem</th>
+                  <th className="actions-column">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {compras.map((compra) => {
+                  const fornecedor =
+                    compra.fornecedores?.nome_fantasia ||
+                    compra.fornecedores?.razao_social ||
+                    'Fornecedor'
+
+                  return (
+                    <tr key={compra.id}>
+
+                      <td>
+                        <div className="client-name">
+                          NF-e {compra.numero_nota || '-'}
+                        </div>
+
+                        <div className="client-secondary">
+                          Série {compra.serie || '-'}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="client-name">
+                          {fornecedor}
+                        </div>
+
+                        <div className="client-secondary">
+                          {compra.fornecedores?.cnpj ||
+                            'CNPJ não informado'}
+                        </div>
+                      </td>
+
+                      <td>
+                        {formatarDataHora(
+                          compra.data_emissao
+                        )}
+                      </td>
+
+                      <td>
+                        {compra.compra_itens?.length || 0}
+                      </td>
+
+                      <td>
+                        <strong>
+                          {formatarMoeda(
+                            compra.valor_total
+                          )}
+                        </strong>
+                      </td>
+
+                      <td>
+                        <span className="purchase-origin">
+                          {compra.origem === 'xml'
+                            ? 'XML'
+                            : 'Manual'}
+                        </span>
+                      </td>
+
+                      <td className="actions-column">
+                        <button
+                          className="icon-button"
+                          title="Visualizar compra"
+                          onClick={() =>
+                            visualizar(compra)
+                          }
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </td>
+
+                    </tr>
+                  )
+                })}
+              </tbody>
+
+            </table>
+
+          </div>
+        )}
+
+      </section>
+    </>
+  )
+}
+
+function ModalDetalheCompra({
+  compra,
+  itens,
+  carregando,
+  fechar
+}) {
+  const fornecedor =
+    compra.fornecedores?.nome_fantasia ||
+    compra.fornecedores?.razao_social ||
+    'Fornecedor'
+
+  const custoTotalItens = itens.reduce(
+    (total, item) =>
+      total + Number(item.valor_total || 0),
+    0
+  )
+
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          fechar()
+        }
+      }}
+    >
+      <div className="modal-box purchase-detail-modal">
+
+        <div className="modal-header">
+
+          <div>
+            <h3>
+              NF-e {compra.numero_nota || '-'}
+            </h3>
+
+            <p>
+              {fornecedor}
+              {' • '}
+              Série {compra.serie || '-'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="modal-close"
+            onClick={fechar}
+          >
+            <X size={18} />
+          </button>
+
+        </div>
+
+        <div className="modal-body">
+
+          <div className="purchase-detail-header">
+
+            <div>
+              <span>Fornecedor</span>
+              <strong>{fornecedor}</strong>
+              <small>
+                {compra.fornecedores?.cnpj ||
+                  'CNPJ não informado'}
+              </small>
+            </div>
+
+            <div>
+              <span>Emissão</span>
+              <strong>
+                {formatarDataHora(
+                  compra.data_emissao
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Valor dos produtos</span>
+              <strong>
+                {formatarMoeda(
+                  compra.valor_produtos
+                )}
+              </strong>
+            </div>
+
+            <div className="purchase-total-box">
+              <span>Total da NF-e</span>
+              <strong>
+                {formatarMoeda(
+                  compra.valor_total
+                )}
+              </strong>
+            </div>
+
+          </div>
+
+          <div className="purchase-key-box">
+            <span>Chave de acesso</span>
+            <strong>
+              {compra.chave_acesso ||
+                'Não informada'}
+            </strong>
+          </div>
+
+          <div className="form-section-title">
+            Produtos da compra
+          </div>
+
+          {carregando ? (
+            <Carregando texto="Carregando itens..." />
+          ) : itens.length === 0 ? (
+            <div className="history-empty">
+              Nenhum item encontrado nesta compra.
+            </div>
+          ) : (
+            <div className="purchase-items">
+
+              {itens.map((item) => {
+                const custo = Number(
+                  item.custo_unitario_final || 0
+                )
+
+                const percentual = Number(
+                  item.produtos?.percentual_lucro || 0
+                )
+
+                const sugerido = Number(
+                  item.produtos?.preco_sugerido || 0
+                )
+
+                const lucro =
+                  sugerido > 0
+                    ? sugerido - custo
+                    : custo * (percentual / 100)
+
+                return (
+                  <div
+                    className="purchase-item-card"
+                    key={item.id}
+                  >
+
+                    <div className="purchase-item-title">
+                      <div>
+                        <strong>
+                          {item.nome_produto}
+                        </strong>
+
+                        <span>
+                          Código: {item.codigo_fornecedor || '-'}
+                          {' • '}
+                          NCM: {item.ncm || '-'}
+                        </span>
+                      </div>
+
+                      <span className="purchase-product-link">
+                        {item.produto_id
+                          ? 'Vinculado ao cadastro'
+                          : 'Sem vínculo'}
+                      </span>
+                    </div>
+
+                    <div className="purchase-item-values">
+
+                      <div>
+                        <span>Quantidade</span>
+                        <strong>
+                          {formatarQuantidade(
+                            item.quantidade
+                          )}{' '}
+                          {item.unidade || ''}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Valor no XML</span>
+                        <strong>
+                          {formatarMoeda(
+                            item.valor_unitario
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Custo final</span>
+                        <strong>
+                          {formatarMoeda(custo)}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Lucro cadastrado</span>
+                        <strong className="profit-value">
+                          {formatarPercentual(
+                            percentual
+                          )}%
+                          {' • '}
+                          {formatarMoeda(lucro)}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Preço sugerido</span>
+                        <strong className="suggested-price">
+                          {formatarMoeda(sugerido)}
+                        </strong>
+                      </div>
+
+                    </div>
+
+                  </div>
+                )
+              })}
+
+            </div>
+          )}
+
+          <div className="purchase-detail-footer-summary">
+
+            <div>
+              <span>Subtotal dos itens</span>
+              <strong>
+                {formatarMoeda(custoTotalItens)}
+              </strong>
+            </div>
+
+            <div>
+              <span>Frete</span>
+              <strong>
+                {formatarMoeda(
+                  compra.valor_frete
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Desconto</span>
+              <strong>
+                {formatarMoeda(
+                  compra.valor_desconto
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Total da NF-e</span>
+              <strong>
+                {formatarMoeda(
+                  compra.valor_total
+                )}
+              </strong>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="modal-footer">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={fechar}
+          >
+            Fechar
+          </button>
+        </div>
+
+      </div>
+    </div>
   )
 }
 
@@ -4886,12 +5983,59 @@ function ModalProduto({
 
                 <input
                   type="number"
+                  min="0"
                   step="0.01"
                   name="custo"
                   value={dados.custo}
                   onChange={alterarCampo}
                 />
               </div>
+
+              {!servico && (
+                <>
+                  <div className="form-group">
+                    <label>Lucro desejado (%)</label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="percentual_lucro"
+                      value={dados.percentual_lucro}
+                      onChange={alterarCampo}
+                      placeholder="20"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Lucro por unidade</label>
+
+                    <div className="calculated-field profit">
+                      {formatarMoeda(
+                        Math.max(
+                          0,
+                          Number(
+                            dados.preco_sugerido || 0
+                          ) -
+                          Number(
+                            dados.custo || 0
+                          )
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Preço sugerido</label>
+
+                    <div className="calculated-field suggested">
+                      {formatarMoeda(
+                        dados.preco_sugerido || 0
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="form-group">
                 <label>Preço de venda</label>
@@ -4963,6 +6107,342 @@ function ModalProduto({
 
       </div>
 
+    </div>
+  )
+}
+
+function ModalImportarXml({
+  dados,
+  carregando,
+  salvando,
+  selecionarXml,
+  alterarLucro,
+  confirmar,
+  fechar
+}) {
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          fechar()
+        }
+      }}
+    >
+      <div className="modal-box xml-modal">
+
+        <div className="modal-header">
+          <div>
+            <h3>Importar XML da NF-e</h3>
+            <p>
+              Selecione o XML enviado pelo fornecedor.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="modal-close"
+            onClick={fechar}
+            disabled={salvando}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {!dados && (
+            <div className="xml-upload-area">
+
+              <div className="xml-upload-icon">
+                <FileText size={28} />
+              </div>
+
+              <h4>Selecione o XML da nota fiscal</h4>
+
+              <p>
+                O sistema vai identificar fornecedor,
+                nota, produtos, valores e custos.
+              </p>
+
+              <label className="primary-button xml-file-button">
+                Selecionar XML
+
+                <input
+                  type="file"
+                  accept=".xml,text/xml,application/xml"
+                  onChange={selecionarXml}
+                  disabled={carregando}
+                  hidden
+                />
+              </label>
+
+              {carregando && (
+                <div className="xml-loading">
+                  <Loader2
+                    size={17}
+                    className="spinner"
+                  />
+                  Lendo XML...
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {dados && (
+            <>
+              <div className="xml-note-header">
+
+                <div>
+                  <span>Fornecedor</span>
+                  <strong>
+                    {dados.fornecedor.nome_fantasia ||
+                      dados.fornecedor.razao_social ||
+                      'Fornecedor'}
+                  </strong>
+
+                  <small>
+                    {dados.fornecedor.cnpj ||
+                      'CNPJ não informado'}
+                  </small>
+                </div>
+
+                <div>
+                  <span>NF-e</span>
+                  <strong>
+                    {dados.nota.numero_nota || '-'}
+                  </strong>
+                  <small>
+                    Série {dados.nota.serie || '-'}
+                  </small>
+                </div>
+
+                <div>
+                  <span>Emissão</span>
+                  <strong>
+                    {dados.nota.data_emissao
+                      ? new Date(
+                          dados.nota.data_emissao
+                        ).toLocaleDateString('pt-BR')
+                      : '-'}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Total da nota</span>
+                  <strong>
+                    {formatarMoeda(
+                      dados.nota.valor_total
+                    )}
+                  </strong>
+                </div>
+
+              </div>
+
+              <div className="form-section-title">
+                Produtos da nota
+              </div>
+
+              <div className="xml-items">
+
+                {dados.itens.map((item, indice) => {
+                  const custo = Number(
+                    item.custo_unitario_final || 0
+                  )
+
+                  const preco = Number(
+                    item.preco_sugerido || 0
+                  )
+
+                  const lucro = preco - custo
+
+                  return (
+                    <div
+                      className="xml-item-card"
+                      key={`${item.numero_item}-${indice}`}
+                    >
+
+                      <div className="xml-item-top">
+                        <div>
+                          <strong>
+                            {item.nome_produto}
+                          </strong>
+
+                          <span>
+                            Código: {item.codigo_fornecedor || '-'}
+                          </span>
+
+                          {item.ean_gtin && (
+                            <span>
+                              GTIN: {item.ean_gtin}
+                            </span>
+                          )}
+                        </div>
+
+                        <div
+                          className={
+                            item.produto_encontrado
+                              ? 'xml-match found'
+                              : 'xml-match new'
+                          }
+                        >
+                          {item.produto_encontrado
+                            ? 'Produto encontrado'
+                            : 'Novo produto'}
+                        </div>
+                      </div>
+
+                      <div className="xml-item-grid">
+
+                        <div>
+                          <span>Quantidade</span>
+                          <strong>
+                            {formatarQuantidade(
+                              item.quantidade
+                            )}{' '}
+                            {item.unidade || ''}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Custo unitário</span>
+                          <strong>
+                            {formatarMoeda(custo)}
+                          </strong>
+                        </div>
+
+                        <div className="xml-profit-field">
+                          <span>Lucro desejado</span>
+
+                          <div className="xml-percent-input">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.percentual_lucro}
+                              onChange={(e) =>
+                                alterarLucro(
+                                  indice,
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <b>%</b>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span>Lucro por unidade</span>
+                          <strong className="profit-value">
+                            {formatarMoeda(lucro)}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Preço sugerido</span>
+                          <strong className="suggested-price">
+                            {formatarMoeda(preco)}
+                          </strong>
+                        </div>
+
+                        {item.produto_encontrado && (
+                          <div>
+                            <span>Preço atual</span>
+                            <strong>
+                              {formatarMoeda(
+                                item.valor_venda_atual
+                              )}
+                            </strong>
+                          </div>
+                        )}
+
+                      </div>
+
+                    </div>
+                  )
+                })}
+
+              </div>
+
+              <div className="xml-note-summary">
+
+                <div>
+                  <span>Produtos</span>
+                  <strong>{dados.itens.length}</strong>
+                </div>
+
+                <div>
+                  <span>Valor dos produtos</span>
+                  <strong>
+                    {formatarMoeda(
+                      dados.nota.valor_produtos
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Frete</span>
+                  <strong>
+                    {formatarMoeda(
+                      dados.nota.valor_frete
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Total NF-e</span>
+                  <strong>
+                    {formatarMoeda(
+                      dados.nota.valor_total
+                    )}
+                  </strong>
+                </div>
+
+              </div>
+            </>
+          )}
+
+        </div>
+
+        <div className="modal-footer">
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={fechar}
+            disabled={salvando}
+          >
+            Cancelar
+          </button>
+
+          {dados && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={confirmar}
+              disabled={salvando}
+            >
+              {salvando ? (
+                <>
+                  <Loader2
+                    size={16}
+                    className="spinner"
+                  />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} />
+                  Confirmar entrada
+                </>
+              )}
+            </button>
+          )}
+
+        </div>
+
+      </div>
     </div>
   )
 }
@@ -6308,5 +7788,15 @@ function nomeStatus(status) {
 
   return nomes[status] || status
 }
-
+function formatarPercentual(valor) {
+  return Number(
+    valor || 0
+  ).toLocaleString(
+    'pt-BR',
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }
+  )
+}
 export default App
